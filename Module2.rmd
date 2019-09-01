@@ -1,0 +1,51 @@
+---
+title: "Module2"
+output:
+  word_document: default
+  html_document: default
+---
+
+# Introduction  
+
+In this file we are downloading a file from the web, importing it, printing out descriptive staistics, transforming a variable, plotting a quantitative variable, creating a scatterpliot, and uploding to Git 
+
+```{r warning = FALSE}
+library(tidyverse)
+library(datasets)
+```
+## Get data and print out summary statistics
+
+We called the datasets library so we can use the famous Iris dataset directly. Lets assign the table to one we name, and print out some summary statistics
+
+```{r}
+iris_table <-iris
+
+summary(iris_table)
+```
+
+#Transform a variable
+Here we will use dplyr to call the dataframe, then multiply a column by 1.1, and set it back to itself. The summary stats should change for that column
+
+```{r}
+iris_table <- iris_table %>%
+  mutate(Petal.Length = Petal.Length*1.1)
+
+summary(iris_table)
+```
+
+#Plot a quantitative variable
+We will now plot a quantitative variable. We will make a box plot of Sepal Length by Species
+
+```{r}
+plot(iris_table$Species, iris_table$Sepal.Length, main="Sepal Length by Species", xlab="Species", ylab="Sepal Length")
+```
+
+#Create a scatterplot
+We will now create a scatterplot. We will plot Sepal Length by Petal Length
+
+```{r}
+plot(iris_table$Sepal.Length, iris_table$Petal.Length, main="Sepal Length vs Petal Length", xlab="Sepal Length", ylab="Petal Length")
+```
+
+
+
