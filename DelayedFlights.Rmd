@@ -1,0 +1,69 @@
+---
+title: "Naive Bayes"
+author: "Mark Pirogowicz"
+date: "October 27, 2019"
+output: word_document
+---
+
+```{r}
+library(caret)
+library(e1071)
+library(pROC)
+library(dplyr)
+```
+
+Pull in the data, do some cleaning, and split the data
+```{r}
+#Pull in data
+fullData <- read.csv("C:/Users/mpirogow/Documents/Perm5/06 - School/ML/Clustering/FlightDelays.csv")
+
+#recode int days of week into the actual days
+fullData$DAY_WEEK = recode(fullData$DAY_WEEK, `1`="Monday",
+                    `2`="Tuesday",
+                    `3`="Wednesday",
+                    `4`="Thursday",
+                    `5`="Friday",
+                    `6`="Saturday",
+                    `7`="Sunday")
+
+#clean up the times
+fullData$CRS_DEP_TIME = as.character(fullData$CRS_DEP_TIME)
+fullData$DEP_TIME = toString(fullData$DEP_TIME)
+
+#create the training and testing sets
+set.seed(123)
+#Divide data into test and train
+Index_Train<-createDataPartition(fullData$Flight.Status, p=0.6, list=FALSE)
+Train <-fullData[Index_Train,]
+Test  <-fullData[-Index_Train,]
+```
+
+Now, run the Naive Bayes model, and predict Default status on the test set (counts table)
+```{r}
+# Build a naïve Bayes classifier
+nb_model <-naiveBayes(Flight.Status~CARRIER+DEST+FL_DATE+ORIGIN+DAY_WEEK,data = Train)
+nb_model
+```
+Now, use the model on the test set. A confusion matrix will be output
+```{r}
+# Predict the default status of test dataset 
+Predicted_Test_labels <-predict(nb_model,Test)
+library("gmodels")
+# Show the confusion matrix of the classifier
+CrossTable(x=Test$Flight.Status,y=Predicted_Test_labels, prop.chisq = FALSE) 
+```
+
+Same thing as above, but at a proportion
+```{r}
+nb_model <-naiveBayes(Flight.Status~CARRIER+DEST+FL_DATE+ORIGIN+DAY_WEEK,data = Train)
+#Make predictions and return probability of each class
+Predicted_Test_labels <-predict(nb_model,Test, type = "raw")
+#show the first few values 
+head(Predicted_Test_labels)
+```
+
+We can now output the ROC curves
+```{r}
+roc(Test$Flight.Status, Predicted_Test_labels[,2])
+plot.roc(Test$Flight.Status,Predicted_Test_labels[,2])
+```
