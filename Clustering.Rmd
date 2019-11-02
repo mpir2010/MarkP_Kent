@@ -1,0 +1,95 @@
+---
+title: "Universities Clustering"
+author: "Mark Pirogowicz"
+date: "October 24, 2019"
+output: word_document
+---
+
+```{r warning = FALSE}
+library(factoextra)
+library(psych)
+library(tidyverse)
+library(usmap)
+```
+
+Lets pull in the data and do some dropping of NA rows and some scaling.
+```{r}
+#Pull in data
+fullData <- read.csv("C:/Users/mpirogow/Documents/Perm5/06 - School/ML/Clustering/Universities.csv")
+
+#remove any columns that hanve NAs
+dataWithoutNA <- na.omit(fullData)
+dataWithoutNA$Public..1...Private..2. <- as.factor(dataWithoutNA$Public..1...Private..2.)
+
+#Lets scale our variables
+finalCleanedData <- as.data.frame(scale(dataWithoutNA[4:20]))
+finalCleanedData <- cbind(dataWithoutNA[1:3],finalCleanedData)
+
+#One final check to make sure data is scaled
+summary(finalCleanedData)
+```
+
+Lets remove unneeded variables, figure out the optimal k, and run k means. Lets also break out the summary statistics by cluster
+```{r}
+#ability to repeat
+set.seed(123)
+
+#remove the variables we are not clusting by
+data <- finalCleanedData[4:20]
+
+#create our cluster with 4 as the k (found below)
+k4 <- kmeans(x = data, centers = 4, nstart = 25)
+
+#lets toss the cluster number on the dataset in order to break out summary statistics later
+dataWithCluster <- cbind(finalCleanedData,k4$cluster)
+
+#lets visualize the clusters
+fviz_cluster(object = k4, data = data)
+
+#2 clusters are optimal
+fviz_nbclust(data, kmeans, method = "silhouette")
+
+#four are optimal here. I chose 4 based on data apperance
+fviz_nbclust(data, kmeans, method = "wss")
+
+#summary statistics broken down by cluster (psych package)
+describeBy(dataWithCluster, dataWithCluster$`k4$cluster`)
+
+#Lets map the state the the cluster that most ofter occurs to see if there is something cool happening. We need to convert appreviations to names to map. This is a lookup table
+#We will join to this
+st_crosswalk <- tibble(state = state.name) %>%
+   bind_cols(tibble(abb = state.abb)) %>% 
+   bind_rows(tibble(state = "District of Columbia", abb = "DC"))
+
+stateClusterData <- dataWithCluster[,c(2,21)]
+names(stateClusterData)[names(stateClusterData) == 'State'] <- 'abb'
+stateClusterData <- left_join(stateClusterData, st_crosswalk, by = "abb")
+
+mode <- function(codes){
+  which.max(tabulate(codes))
+}
+
+stateClusterData <- stateClusterData %>% 
+  group_by(state) %>% 
+  summarise(`k4$cluster` = mode(`k4$cluster`))
+
+stateClusterData$`k4$cluster` <- as.factor(stateClusterData$`k4$cluster`)
+
+#lets map it!
+plot_usmap(data = stateClusterData, values = "k4$cluster") + scale_fill_manual(values=c("red", "blue", "green","yellow"), name="cluster") + theme(legend.position = "right")
+```
+
+Lets look at Tufts and figure out what cluster it would be in if we used only the data we had
+```{r}
+#GEt a DF of just Tufts data
+tufts <- fullData %>%
+  filter(College.Name=="Tufts University") 
+  
+
+#remove NAs
+tufts <- Filter(function(x) !all(is.na(x)), tufts)
+
+```
+To be honest I dont know how to do this part. I dont have scaled data for Tufts because that row was dropped before I scaled for clustering because it contained an NA value. If I scale before dropping NAs then my cluster data will no longer be 0 at the Mean. If I get scaled data for Tufts after the fact it does not line up because the scaling does not match. Hopefully writing this down will show that I put thought into it and I would like to see the solution so I can understand. I made an extra map chart to prove that I want to learn :)
+
+All other answers are written out in the quiz.
