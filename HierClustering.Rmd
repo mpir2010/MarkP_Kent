@@ -1,0 +1,129 @@
+---
+title: "Cereals"
+author: "Mark Pirogowicz"
+date: "November 7, 2019"
+output: word_document
+---
+## Cereals
+
+This dataset includes nutritional information, store display, and consumer ratings for 77 breakfast cereals. We will use this to perform hierarchical clustering and ultimately find a cluster of healthy cereals for a local school.
+
+Lets gather some packages, as well as bring in data and clean the data.
+```{r warning=FALSE}
+library(tidyverse)
+library(cluster)
+library(dplyr)
+
+#Pull in data
+all_data <- read.csv("C:/Users/mpirogow/Documents/Perm5/06 - School/ML/Cereals.csv")
+
+#there are a few NAs so lets remove those rows
+data_no_na <- na.omit(all_data)
+
+#lets scale the data
+data_scaled <- as.data.frame(scale(data_no_na[4:16]))
+
+#bring the data back together
+data_final <- cbind(data_no_na[1:3],data_scaled)
+
+#print summary of final data
+summary(data_final)
+```
+
+Now we will test 4 different methods and pick the one with the highest agglomerative coefficient
+```{r}
+#compute with agnes and with different linkage methods
+hc_single <- agnes(data_final, metric = "euclidean", method = "single")
+hc_complete <- agnes(data_final, metric = "euclidean", method = "complete")
+hc_average <- agnes(data_final, metric = "euclidean", method = "average")
+hc_ward <- agnes(data_final, metric = "euclidean", method = "ward")
+
+print(hc_single$ac)
+print(hc_complete$ac)
+print(hc_average$ac)
+
+#wardis the method with the best agglomerative coefficient
+print(hc_ward$ac)
+```
+We will now plot the hierarchical clustering model using the ward method
+```{r}
+hc_ward$labels <- data_final$name
+pltree(hc_ward, cex = 0.6, hang = -1, main = "Dendrogram of agnes")
+```
+
+Looking at the diagram, I would choose 4 clusters
+```{r warning=FALSE}
+d <- dist(data_final, method = "euclidean")
+# compute divisive hierarchical clustering
+hc_ward <- hclust(d,method = "ward.D")
+hc_ward$labels <- data_final$name
+plot(hc_ward, hang=-1, cex = 0.6)
+rect.hclust(hc_ward, k = 4, border = 1:4)
+```
+
+Lets test for stability
+```{r warning=FALSE}
+#split data in half
+data_final$id <- 1:nrow(data_final)
+part1 <- data_final %>% dplyr::sample_frac(.50)
+part2 <- dplyr::anti_join(data_final, part1, by = 'id')
+
+#Cluster on the first partition as normal
+part1 <-  subset(part1, select = -c(id))
+part2 <- subset(part2, select = -c(id))
+d <- dist(part1, method = "euclidean")
+
+# compute hierarchical clustering
+hc_ward <- hclust(d,method = "ward.D")
+hc_ward$labels <- part1$name
+plot(hc_ward, hang=-1, cex = 0.6)
+rect.hclust(hc_ward, k = 4, border = 1:4)
+
+#we need to get the cluster centroids
+clusters <- cutree(hclust(d,method = "ward.D"), k = 4)
+part1$cluster <- clusters
+centroids <- part1 %>%
+  group_by(cluster) %>%
+  summarise_all(funs(mean))
+
+#I could nto figure out how to assign the cluster centorids I have from Part 1 to the data in part 2. Could you please post an example so I can see how?
+```
+
+We have been asked to find a cluster with healthy data. As part of this, we will not scale our data. The reason for this is because we do not want unhealthy values to influence the mean of healthy cereals. We dont want to normalize the mean around 0 when many of our cereals are unhealthy and thus would make some less helalthy ones look better than they are. We will assume that the healthy cereals will stand out. It is ok that the data will be skewed because we are looking for a specific cluster/type. Once again, we do not want to let the unhealthy cereals influence the healthy clusters. If you normalize, this may happen. 
+```{r warning=FALSE}
+d <- dist(data_no_na, method = "euclidean")
+# compute divisive hierarchical clustering
+hc_ward <- hclust(d,method = "ward.D")
+hc_ward$labels <- data_no_na$name
+plot(hc_ward, hang=-1, cex = 0.6)
+rect.hclust(hc_ward, k = 4, border = 1:4)
+
+clusters <- cutree(hclust(d,method = "ward.D"), k = 4)
+data_no_na$cluster <- clusters
+
+```
+Looking at this analysis, the healthiest cereals are in cluster 1. This includes cereals like 100% Bran, All Bran with Extra Fiber, Raisn Nut Bran, and Frutiful Bran. The kids will love these.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
