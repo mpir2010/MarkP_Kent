@@ -1,0 +1,127 @@
+---
+title: "Mark Pirogowicz Final"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+Lets pull in our required packages
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library(tidyverse)
+library(factoextra)
+library(ISLR)
+library(psych)
+library(e1071)
+library(caret)
+library(gmodels)
+set.seed(123)
+```
+
+Lets created separate data frames to answer each part of the question
+```{r}
+
+pct_to_number <- function(x){
+    x_replace_pct<-sub("%", "", x)
+    x_as_numeric<-as.numeric(x_replace_pct)
+}
+
+#Pull in data
+fullData <- read.csv("C:/Users/mpirogow/Documents/Perm5/06 - School/ML/BathSoap.csv")
+fullData$Member.id <- as.factor(fullData$Member.id)
+
+#split data into:
+#purchase behavior attributes: (volume, frequency, susceptibility to discounts, and brand loyalty)
+pur_beh <- cbind(fullData[1],scale(fullData[15]),fullData[21:22],scale(fullData[12:13]),scale(fullData[17]))
+pur_beh$Pur.Vol.Other.Promo.. <- scale(pct_to_number(pur_beh$Pur.Vol.Other.Promo..))
+pur_beh$Pur.Vol.Promo.6.. <- scale(pct_to_number(pur_beh$Pur.Vol.Promo.6..))
+
+#basis for purchase attibutes:  (price, selling proposition)
+pur <- cbind(fullData[1],scale(fullData[19]),fullData[36:46])
+pur$PropCat.5 <- scale(pct_to_number(pur$PropCat.5))
+pur$PropCat.6 <- scale(pct_to_number(pur$PropCat.6))
+pur$PropCat.7 <- scale(pct_to_number(pur$PropCat.7))
+pur$PropCat.8 <- scale(pct_to_number(pur$PropCat.8))
+pur$PropCat.9 <- scale(pct_to_number(pur$PropCat.9))
+pur$PropCat.10 <- scale(pct_to_number(pur$PropCat.10))
+pur$PropCat.11 <- scale(pct_to_number(pur$PropCat.11))
+pur$PropCat.12 <- scale(pct_to_number(pur$PropCat.12))
+pur$PropCat.13 <- scale(pct_to_number(pur$PropCat.13))
+pur$PropCat.14 <- scale(pct_to_number(pur$PropCat.14))
+pur$PropCat.15 <- scale(pct_to_number(pur$PropCat.15))
+
+#both sets of attributes
+pur_both <- merge(pur_beh,pur,by="Member.id")
+```
+
+Lets determine optimal from one set. We will want to have the same number of clusters for all. 
+```{r}
+fviz_nbclust(pur_beh[2:7], kmeans, method = "wss")
+fviz_nbclust(pur_beh[2:7], kmeans, method = "silhouette")
+```
+It looks like we will want 3 clusters. This fits with our marketing effort limitations
+
+Lets cluster and export a few interesting graphs.
+```{r}
+k4_pur_beh <- kmeans(pur_beh, centers = 3, nstart = 25) # k = 3, number of restarts = 25
+fviz_cluster(k4_pur_beh, data = pur_beh[5:6]) # Visualize the output
+fviz_cluster(k4_pur_beh, data = select(pur_beh, No..of..Trans, Pur.Vol.Other.Promo..)) # Visualize the output
+pur_beh$cluster_num <- k4_pur_beh$cluster
+
+k4_pur <- kmeans(pur, centers = 3, nstart = 25) # k = 3, number of restarts = 25
+fviz_cluster(k4_pur, data = pur[2:3]) # Visualize the output
+fviz_cluster(k4_pur, data = select(pur, Avg..Price, PropCat.15)) # Visualize the output
+pur$cluster_num <- k4_pur$cluster
+
+k4_pur_both <- kmeans(pur_both, centers = 3, nstart = 25) # k = 3, number of restarts = 25
+fviz_cluster(k4_pur_both, select(pur_both, Avg..Price, Pur.Vol.Other.Promo..)) # Visualize the output
+fviz_cluster(k4_pur_both, select(pur_both, No..of.Brands, Avg..Price))
+pur_both$cluster_num <- k4_pur_both$cluster
+```
+
+Looking at the above visualizations, we see some interesting details. People who buy more brands typically have a higher number of consecutive purchases of that brand.
+The number of transactions is inversely related to people purchasing on promotion. . . meaning that the more transactions someone has, the less likely they are to purchase on promotion.
+The higher the average price, the less likely the product is purchased under a product proposition category.
+Just like the number of transactions, the price point is also inversely related to purchasing on promotion. . . meaning that the higher the price, the more likely it was not purchased on promotion.
+The less brands people buy, the more they pay. The more brands someone buys, the less they paid. This could imply people are deal shopping.
+
+Lets describe our clusters so we understand whats going on in them. Details for purchase behavior attributes:
+```{r}
+describeBy(pur_beh, pur_beh$cluster_num)
+```
+
+Analysing our purchase behavior clusters, it looks like cluster 1 contains people with less transations than average, more promotional purchases, and purchasing more brands. Cluster 2 contains people with more transactions than average, less promotional purchases, and purchases less brands. Cluster 3 contains people who have slightly more transactions than average, slightly more promotional purchases than average, and purchases more brands.
+
+Details for purchase attibutes:
+```{r}
+describeBy(pur, pur$cluster_num)
+```
+
+Analysing our purchase attibute clusters, it looks like cluster 1 contains people with a slightly lower than average price and who are less likely to purchase a product under a proposition category. Cluster 2 contains people with a higher than average price and who are more likely to purchase a product under a proposition category. Cluster 3 contains people with a lower than average price and who are less likely to purchase a product under a proposition category.
+
+Details for both sets together:
+```{r}
+describeBy(pur_both, pur_both$cluster_num)
+```
+
+Analysing our combined attibute clusters, it looks like cluster 1 contains people with a higher than average price, who are more likely to purchase a product under a proposition category, and who buy more brands. Cluster 2 contains people with a lower than average price, who are less likely to purchase a product under a proposition category, and who buy more brands. Cluster 3 contains people with a lower than average price, who are less likely to purchase a product under a proposition category, and who buy less brands.
+
+Looking at all of these clusters, I would want to target cluster 1 of the combined data. These people spent more than average, were responsive to propositions, and bought more brands. Perhaps there is an opportunity to advertise to them for several new brands. Their loyalty to any one brand is questionable but I believe there is opportunity here. Lets look at the demographics of this cluster, so we can try to target them.
+
+Lets look at the demographics of those in Cluster 1
+```{r}
+fullData$cluster_num <- pur_both$cluster_num
+
+fullData <- filter(fullData, cluster_num == 1)
+
+summary(fullData)
+```
+Looking at the summary data for the cluster we want to target, we should target of medium to high socioeconomic class (1, centered around 1.5, but no higher than 3). All diets are represented but this cluster overindexes with vegetarian and vegeterian like diets (eats eggs). The gender of these customers is overwhelming female. The age of these people fall between 3 and 4, centering at 3.21. These clients are modertly educated, centering with a 5 on a 1 - 9 scale. They also have medium sized households, with an average of 3.5 persons in their house hold. There are children in the household, centering around a value of 3.3. These people are very likely to have a television present. Finally, these people average a 21 on the affluence scale, but can skew slightly less.
+
+In summary, to target the optimal cluster, we would want to target females through television with an age category of 3 - 4, who have a household size of 3 - 4, who have a child with a category of 3 - 4, who are of medium to high socionomic class (1 - 3), who may have a vegeterian or vegetarian like diet, and have an affluency factor of 20 - 30.
+
+
+
+
+
+
